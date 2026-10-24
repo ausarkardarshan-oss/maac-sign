@@ -86,6 +86,22 @@ export function TemplatesPage() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
+  const handleDelete = async (template) => {
+    const targetId = template?.id || template?._id;
+    if (!targetId) {
+      toast('Cannot remove template: missing ID');
+      return;
+    }
+    if (!window.confirm(`Remove template "${template.name}"?`)) return;
+    try {
+      await templateService.deleteTemplate(targetId);
+      toast('Template removed');
+      load();
+    } catch (err) {
+      toast(err.message || 'Failed to remove template');
+    }
+  };
+
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
@@ -111,11 +127,24 @@ export function TemplatesPage() {
       ) : (
         <div className="metrics">
           {templates.map((t) => (
-            <div className="card" key={t.id}>
-              <span className="metricicon">▣</span>
-              <h3 style={{ margin: '12px 0 4px', fontSize: '14px' }}>{t.name}</h3>
-              <p className="smallmuted">{t.document}</p>
-              <p className="smallmuted">{t.created?.slice(0, 10)}</p>
+            <div className="card" key={t.id} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span className="metricicon">▣</span>
+                <h3 style={{ margin: '12px 0 4px', fontSize: '15px', wordBreak: 'break-word' }}>{t.name}</h3>
+                <p className="smallmuted" style={{ margin: '4px 0' }}>▤ {t.document}</p>
+                <p className="smallmuted" style={{ margin: '4px 0 16px' }}>Created: {t.created?.slice(0, 10)}</p>
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ width: '100%', fontSize: '12px', padding: '8px 12px', color: '#c93b3b' }}
+                  onClick={() => handleDelete(t)}
+                  title={`Remove ${t.name}`}
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
         </div>

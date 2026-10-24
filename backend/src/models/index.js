@@ -9,6 +9,8 @@ const Template = require('./Template');
 const Form = require('./Form');
 const Certificate = require('./Certificate');
 
+const Notification = require('./Notification');
+
 module.exports = {
   User,
   Session,
@@ -19,4 +21,5 @@ module.exports = {
   Template,
   Form,
   Certificate,
+  Notification,
 };

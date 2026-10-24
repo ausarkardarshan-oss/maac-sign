@@ -1,5 +1,5 @@
 'use strict';
-const { Template, Form, Document } = require('../models');
+const { Template, Form, Document, Notification } = require('../models');
 const { uid, now } = require('../utils/crypto');
 
 /**
@@ -11,7 +11,7 @@ async function listTemplates(userId) {
   for (const t of templates) {
     const doc = await Document.findById(t.document_id);
     results.push({
-      id: t.id,
+      id: t.id || t._id,
       name: t.name,
       document_id: t.document_id,
       document: doc ? doc.name : 'Unknown',
@@ -39,7 +39,19 @@ async function createTemplate(userId, { documentId, name }) {
     document_id: documentId,
     created: now(),
   });
-  return { id: template.id, name: template.name };
+  try {
+    await Notification.create({
+      _id: uid(),
+      user_id: userId,
+      title: 'Template Created',
+      message: `Template "${template.name}" is now ready for reusable signing.`,
+      type: 'template',
+      link: '/templates',
+      read: false,
+      created: now(),
+    });
+  } catch {}
+  return { id: template.id || template._id, name: template.name };
 }
 
 /**
@@ -51,7 +63,7 @@ async function listForms(userId) {
   for (const f of forms) {
     const doc = await Document.findById(f.document_id);
     results.push({
-      id: f.id,
+      id: f.id || f._id,
       name: f.name,
       document_id: f.document_id,
       document: doc ? doc.name : 'Unknown',
@@ -81,7 +93,70 @@ async function createForm(userId, { documentId, name }) {
     enabled: 1,
     created: now(),
   });
-  return { id: form.id, name: form.name };
+  try {
+    await Notification.create({
+      _id: uid(),
+      user_id: userId,
+      title: 'SignForm Created',
+      message: `SignForm "${form.name}" has been established.`,
+      type: 'signform',
+      link: '/signforms',
+      read: false,
+      created: now(),
+    });
+  } catch {}
+  return { id: form.id || form._id, name: form.name };
 }
 
-module.exports = { listTemplates, createTemplate, listForms, createForm };
+/**
+ * Delete a template.
+ */
+async function deleteTemplate(userId, templateId) {
+  if (!templateId) {
+    const err = new Error('Template ID is required');
+    err.status = 400;
+    throw err;
+  }
+  const idStr = String(templateId);
+  const result = await Template.findOneAndDelete({
+    $or: [{ _id: idStr }, { id: idStr }],
+    owner_id: userId,
+  });
+  if (!result) {
+    const err = new Error('Template not found');
+    err.status = 404;
+    throw err;
+  }
+  return { ok: true };
+}
+
+/**
+ * Delete a SignForm.
+ */
+async function deleteForm(userId, formId) {
+  if (!formId) {
+    const err = new Error('SignForm ID is required');
+    err.status = 400;
+    throw err;
+  }
+  const idStr = String(formId);
+  const result = await Form.findOneAndDelete({
+    $or: [{ _id: idStr }, { id: idStr }],
+    owner_id: userId,
+  });
+  if (!result) {
+    const err = new Error('SignForm not found');
+    err.status = 404;
+    throw err;
+  }
+  return { ok: true };
+}
+
+module.exports = {
+  listTemplates,
+  createTemplate,
+  deleteTemplate,
+  listForms,
+  createForm,
+  deleteForm,
+};

@@ -9,6 +9,10 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     hash: { type: String, required: true },
     salt: { type: String, required: true },
+    notification_preferences: {
+      email_on_complete: { type: Boolean, default: true },
+      signer_reminders: { type: Boolean, default: true },
+    },
     created: { type: String, default: now },
   },
   {

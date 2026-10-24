@@ -1,7 +1,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { Request, Recipient, Document, User, Certificate, Audit } = require('../models');
+const { Request, Recipient, Document, User, Certificate, Audit, Notification } = require('../models');
 const { STORAGE_DIR } = require('../config/database');
 const { uid, now, hash, randomToken } = require('../utils/crypto');
 const { appendAudit, getAuditTrail } = require('./auditService');
@@ -99,6 +99,19 @@ async function createSigningRequest({ userId, documentId, recipientEmail, recipi
       error: emailError,
     });
   }
+
+  try {
+    await Notification.create({
+      _id: uid(),
+      user_id: userId,
+      title: 'Signature Request Sent',
+      message: `Request for "${doc.name}" was dispatched to ${recipientEmail}.`,
+      type: 'request',
+      link: '/requests',
+      read: false,
+      created: now(),
+    });
+  } catch {}
 
   return {
     id: requestId,
@@ -570,6 +583,19 @@ async function submitSignature(token, { signature, consent, ipAddress, userAgent
     }
 
     await Request.findByIdAndUpdate(info.request_id, { completion_notified: true });
+
+    try {
+      await Notification.create({
+        _id: uid(),
+        user_id: originalDoc.owner_id,
+        title: 'Document Fully Signed! 🎉',
+        message: `"${originalDoc.name}" has been completed and certified with an audit trail.`,
+        type: 'signing',
+        link: '/documents',
+        read: false,
+        created: now(),
+      });
+    } catch {}
   }
 
   return {

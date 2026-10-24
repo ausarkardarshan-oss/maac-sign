@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { toast } from '../common/Toast.jsx';
+import { NotificationDropdown } from './NotificationDropdown.jsx';
 
 const PAGE_LABELS = {
   '/dashboard': 'Overview',
@@ -85,14 +85,7 @@ export function AppHeader({ onMenuToggle, onSearch, searchQuery = '' }) {
             </button>
           )}
         </label>
-        <button
-          className="iconbtn"
-          id="notifications"
-          title="Notifications"
-          onClick={() => toast('No new notifications in demo')}
-        >
-          ♧
-        </button>
+        <NotificationDropdown />
         <div className="avatar small">{getInitials(user?.name)}</div>
       </div>
     </header>

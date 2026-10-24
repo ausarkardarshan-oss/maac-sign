@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { Document, Audit, Certificate } = require('../models');
+const { Document, Audit, Certificate, Notification } = require('../models');
 const { STORAGE_DIR } = require('../config/database');
 const { uid, now } = require('../utils/crypto');
 const { appendAudit } = require('./auditService');
@@ -45,6 +45,18 @@ async function uploadDocument({ userId, name, base64 }) {
   });
 
   await appendAudit(id, userId, 'uploaded', { size: data.length });
+  try {
+    await Notification.create({
+      _id: uid(),
+      user_id: userId,
+      title: 'Document Uploaded',
+      message: `"${doc.name}" was uploaded and is ready for signature requests.`,
+      type: 'document',
+      link: '/documents',
+      read: false,
+      created: now(),
+    });
+  } catch {}
   return { id: doc.id, name: doc.name, sha256: doc.sha256, status: doc.status };
 }
 

@@ -12,8 +12,8 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   // Notifications state
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [reminders, setReminders] = useState(true);
+  const [emailNotifs, setEmailNotifs] = useState(user?.notification_preferences?.email_on_complete ?? true);
+  const [reminders, setReminders] = useState(user?.notification_preferences?.signer_reminders ?? true);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -29,6 +29,25 @@ export function SettingsPage() {
       setActiveModal(null);
     } catch (err) {
       toast(err.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    setSaving(true);
+    try {
+      const updated = await authService.updateProfile({
+        notification_preferences: {
+          email_on_complete: emailNotifs,
+          signer_reminders: reminders,
+        },
+      });
+      updateUser(updated);
+      toast('Notification preferences saved');
+      setActiveModal(null);
+    } catch (err) {
+      toast(err.message || 'Failed to save notification preferences');
     } finally {
       setSaving(false);
     }
@@ -67,6 +86,9 @@ export function SettingsPage() {
                 if (sec.id === 'profile') {
                   setName(user?.name || '');
                   setEmail(user?.email || '');
+                } else if (sec.id === 'notifications') {
+                  setEmailNotifs(user?.notification_preferences?.email_on_complete ?? true);
+                  setReminders(user?.notification_preferences?.signer_reminders ?? true);
                 }
                 setActiveModal(sec.id);
               }}
@@ -138,13 +160,12 @@ export function SettingsPage() {
           </div>
           <div className="btngroup">
             <button
+              type="button"
               className="btn primary"
-              onClick={() => {
-                toast('Notification preferences saved');
-                setActiveModal(null);
-              }}
+              disabled={saving}
+              onClick={handleSaveNotifications}
             >
-              Save
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </Modal>

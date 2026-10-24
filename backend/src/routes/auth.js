@@ -74,8 +74,8 @@ router.get('/me', async (req, res, next) => {
 // PATCH /api/me
 router.patch('/me', requireAuth, async (req, res, next) => {
   try {
-    const { name, email } = req.body;
-    const updated = await updateProfile(req.user.id, { name, email });
+    const { name, email, notification_preferences } = req.body;
+    const updated = await updateProfile(req.user.id, { name, email, notification_preferences });
     res.json(updated);
   } catch (err) {
     next(err);

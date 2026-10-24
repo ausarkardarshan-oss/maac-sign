@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const signingRoutes = require('./routes/signing');
 const templateRoutes = require('./routes/templates');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/api', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api', signingRoutes);
 app.use('/api', templateRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Reports endpoint
 app.get('/api/reports', require('./middleware/auth').requireAuth, async (req, res, next) => {

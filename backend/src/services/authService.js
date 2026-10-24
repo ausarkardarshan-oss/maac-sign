@@ -46,7 +46,12 @@ async function getSessionUser(req) {
   const user = await User.findById(session.user_id);
   if (!user) return null;
 
-  return { id: user.id, email: user.email, name: user.name };
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    notification_preferences: user.notification_preferences || { email_on_complete: true, signer_reminders: true },
+  };
 }
 
 /**
@@ -102,7 +107,7 @@ async function login({ email, password }) {
 /**
  * Update user profile.
  */
-async function updateProfile(userId, { name, email }) {
+async function updateProfile(userId, { name, email, notification_preferences }) {
   const update = {};
   if (name && typeof name === 'string' && name.trim().length > 0) {
     update.name = name.trim();
@@ -117,9 +122,20 @@ async function updateProfile(userId, { name, email }) {
     }
     update.email = emailClean;
   }
+  if (notification_preferences && typeof notification_preferences === 'object') {
+    update.notification_preferences = {
+      email_on_complete: Boolean(notification_preferences.email_on_complete),
+      signer_reminders: Boolean(notification_preferences.signer_reminders),
+    };
+  }
 
   const updated = await User.findByIdAndUpdate(userId, update, { new: true });
-  return { id: updated.id, email: updated.email, name: updated.name };
+  return {
+    id: updated.id,
+    email: updated.email,
+    name: updated.name,
+    notification_preferences: updated.notification_preferences,
+  };
 }
 
 /**

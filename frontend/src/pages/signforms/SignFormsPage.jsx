@@ -76,6 +76,22 @@ export function SignFormsPage() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
+  const handleDelete = async (form) => {
+    const targetId = form?.id || form?._id;
+    if (!targetId) {
+      toast('Cannot remove SignForm: missing ID');
+      return;
+    }
+    if (!window.confirm(`Remove SignForm "${form.name}"?`)) return;
+    try {
+      await templateService.deleteForm(targetId);
+      toast('SignForm removed');
+      load();
+    } catch (err) {
+      toast(err.message || 'Failed to remove SignForm');
+    }
+  };
+
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
@@ -101,11 +117,24 @@ export function SignFormsPage() {
       ) : (
         <div className="metrics">
           {forms.map((f) => (
-            <div className="card" key={f.id}>
-              <span className="metricicon">⌁</span>
-              <h3 style={{ margin: '12px 0 4px', fontSize: '14px' }}>{f.name}</h3>
-              <p className="smallmuted">{f.document}</p>
-              <p className="smallmuted">{f.created?.slice(0, 10)}</p>
+            <div className="card" key={f.id} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <span className="metricicon">⌁</span>
+                <h3 style={{ margin: '12px 0 4px', fontSize: '15px', wordBreak: 'break-word' }}>{f.name}</h3>
+                <p className="smallmuted" style={{ margin: '4px 0' }}>▤ {f.document}</p>
+                <p className="smallmuted" style={{ margin: '4px 0 16px' }}>Created: {f.created?.slice(0, 10)}</p>
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ width: '100%', fontSize: '12px', padding: '8px 12px', color: '#c93b3b' }}
+                  onClick={() => handleDelete(f)}
+                  title={`Remove ${f.name}`}
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
         </div>
