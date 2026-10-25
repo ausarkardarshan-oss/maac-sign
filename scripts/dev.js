@@ -11,7 +11,7 @@ console.log('\x1b[36m%s\x1b[0m', '✦ Starting MAAC AI Sign Development Servers.
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 // Start backend with automatic reload on changes
-const backend = spawn(process.execPath, ['--watch', 'src/server.js'], {
+const backend = spawn(process.execPath, ['--watch', '--watch-path=src', 'src/server.js'], {
   cwd: backendDir,
   env: { ...process.env, PORT: '3001' },
   stdio: ['inherit', 'pipe', 'pipe'],

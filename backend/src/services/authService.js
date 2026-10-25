@@ -95,7 +95,7 @@ async function login({ email, password }) {
   const attempt = crypto.scryptSync(password, user.salt, 64);
   const stored = Buffer.from(user.hash, 'hex');
 
-  if (!crypto.timingSafeEqual(attempt, stored)) {
+  if (attempt.length !== stored.length || !crypto.timingSafeEqual(attempt, stored)) {
     const err = new Error('Invalid credentials');
     err.status = 401;
     throw err;

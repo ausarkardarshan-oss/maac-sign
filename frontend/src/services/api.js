@@ -37,7 +37,15 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new ApiError(data.error || `Request failed (${response.status})`, response.status);
+    let errorMsg = data.error;
+    if (!errorMsg) {
+      if (response.status === 502 || response.status === 503) {
+        errorMsg = 'Backend server is temporarily unavailable or restarting. Please retry in a moment.';
+      } else {
+        errorMsg = `Request failed (${response.status})`;
+      }
+    }
+    throw new ApiError(errorMsg, response.status);
   }
 
   return data;
