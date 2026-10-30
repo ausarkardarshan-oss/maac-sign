@@ -296,206 +296,60 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
     }
   }
 
-  // Add a dedicated Signature Execution page
-  const page = pdfDoc.addPage([612, 792]); // Standard US Letter
-  const { width, height } = page.getSize();
-  const margin = 40;
-  let y = height - 45;
+  // If no specific fields were placed on the document pages, stamp signatures at the bottom of the last page
+  if ((!fields || fields.length === 0) && Array.isArray(signers) && signers.length > 0) {
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    const { width: pWidth } = lastPage.getSize();
+    const stampMargin = 40;
+    const availableWidth = pWidth - stampMargin * 2;
+    const numSigners = Math.min(signers.length, 3);
+    const colWidth = availableWidth / numSigners;
 
-  // Header Bar
-  page.drawRectangle({
-    x: margin,
-    y: y - 35,
-    width: width - margin * 2,
-    height: 48,
-    color: C_DARK,
-  });
+    for (let i = 0; i < signers.length; i++) {
+      const s = signers[i];
+      const col = i % numSigners;
+      const sigX = stampMargin + col * colWidth;
+      const sigY = 25 + Math.floor(i / numSigners) * 50;
 
-  page.drawText('MAAC AI SIGN', {
-    x: margin + 14,
-    y: y - 16,
-    size: 15,
-    font: fontBold,
-    color: rgb(1, 1, 1),
-  });
-
-  page.drawText('VERIFIED ELECTRONIC EXECUTION SHEET', {
-    x: margin + 14,
-    y: y - 29,
-    size: 8,
-    font: fontRegular,
-    color: C_ACCENT,
-  });
-
-  y -= 55;
-
-  // Document Info Sub-Header
-  page.drawText(`Document: ${documentName || 'Agreement'}`, {
-    x: margin,
-    y,
-    size: 11,
-    font: fontBold,
-    color: C_BLACK,
-  });
-  y -= 14;
-
-  page.drawText(safeText(`Document ID: ${documentId} | Execution Completed: ${new Date().toUTCString()}`), {
-    x: margin,
-    y,
-    size: 9,
-    font: fontRegular,
-    color: C_MUTED,
-  });
-  y -= 22;
-
-  // Divider
-  page.drawLine({
-    start: { x: margin, y },
-    end: { x: width - margin, y },
-    thickness: 1,
-    color: C_LINE,
-  });
-  y -= 20;
-
-  // Signer Blocks
-  for (let idx = 0; idx < signers.length; idx++) {
-    const s = signers[idx];
-    const blockHeight = 150;
-
-    if (y - blockHeight < margin + 40) {
-      // If we run out of room on the page, create an additional page
-      const newPage = pdfDoc.addPage([612, 792]);
-      y = height - margin;
-    }
-
-    // Signer Card background
-    page.drawRectangle({
-      x: margin,
-      y: y - blockHeight,
-      width: width - margin * 2,
-      height: blockHeight,
-      color: C_BG_CARD,
-      borderColor: C_LINE,
-      borderWidth: 1,
-    });
-
-    let cardY = y - 18;
-
-    // Header in card
-    page.drawText(safeText(`Signer ${idx + 1}: ${s.name || 'Signer'} (${s.email || 'Email'})`), {
-      x: margin + 16,
-      y: cardY,
-      size: 11,
-      font: fontBold,
-      color: C_DARK,
-    });
-    cardY -= 14;
-
-    page.drawText(safeText(`Status: Signed | Timestamp: ${s.signed_at || new Date().toUTCString()}`), {
-      x: margin + 16,
-      y: cardY,
-      size: 9,
-      font: fontRegular,
-      color: C_MUTED,
-    });
-    cardY -= 13;
-
-    if (s.ip_address) {
-      page.drawText(safeText(`IP Address: ${s.ip_address} | Consent: Explicit agreement recorded under UETA / ESIGN`), {
-        x: margin + 16,
-        y: cardY,
-        size: 8,
-        font: fontRegular,
-        color: C_MUTED,
-      });
-      cardY -= 16;
-    } else {
-      page.drawText(`Consent: Explicit agreement recorded under UETA / ESIGN`, {
-        x: margin + 16,
-        y: cardY,
-        size: 8,
-        font: fontRegular,
-        color: C_MUTED,
-      });
-      cardY -= 16;
-    }
-
-    // Signature Area Box
-    const sigBoxWidth = width - margin * 2 - 32;
-    const sigBoxHeight = 65;
-    page.drawRectangle({
-      x: margin + 16,
-      y: cardY - sigBoxHeight,
-      width: sigBoxWidth,
-      height: sigBoxHeight,
-      color: rgb(1, 1, 1),
-      borderColor: C_LINE,
-      borderWidth: 1,
-    });
-
-    // Check if drawn signature image exists
-    let embeddedDrawn = false;
-    if (s.signature && typeof s.signature === 'string' && s.signature.startsWith('data:image/png;base64,')) {
-      try {
-        const base64Data = s.signature.replace(/^data:image\/png;base64,/, '');
-        const imgBuffer = Buffer.from(base64Data, 'base64');
-        const embeddedImg = await pdfDoc.embedPng(imgBuffer);
-        const imgDims = embeddedImg.scaleToFit(sigBoxWidth - 20, sigBoxHeight - 12);
-
-        page.drawImage(embeddedImg, {
-          x: margin + 26,
-          y: cardY - sigBoxHeight + (sigBoxHeight - imgDims.height) / 2,
-          width: imgDims.width,
-          height: imgDims.height,
-        });
-        embeddedDrawn = true;
-      } catch (err) {
-        // Fall back to text if image parsing fails
-        embeddedDrawn = false;
+      let drawn = false;
+      if (s.signature && typeof s.signature === 'string' && s.signature.startsWith('data:image/')) {
+        try {
+          const isPng = s.signature.startsWith('data:image/png');
+          const base64Data = s.signature.replace(/^data:image\/\w+;base64,/, '');
+          const imgBuffer = Buffer.from(base64Data, 'base64');
+          const embeddedImg = isPng ? await pdfDoc.embedPng(imgBuffer) : await pdfDoc.embedJpg(imgBuffer);
+          const imgDims = embeddedImg.scaleToFit(Math.min(130, colWidth - 20), 35);
+          lastPage.drawImage(embeddedImg, {
+            x: sigX,
+            y: sigY,
+            width: imgDims.width,
+            height: imgDims.height,
+          });
+          drawn = true;
+        } catch {}
       }
-    }
-
-    if (!embeddedDrawn) {
-      const sigDisplayText = (s.signature && s.signature.startsWith('Typed: '))
-        ? s.signature.replace('Typed: ', '')
-        : (s.name || 'Verified Signer');
-
-      page.drawText(sigDisplayText, {
-        x: margin + 28,
-        y: cardY - sigBoxHeight + 24,
-        size: 20,
-        font: fontItalic,
-        color: C_GREEN,
-      });
-
-      page.drawText('Digitally validated via secure session and hash record', {
-        x: margin + 28,
-        y: cardY - sigBoxHeight + 10,
+      if (!drawn) {
+        const sigText = (s.signature && s.signature.startsWith('Typed: '))
+          ? s.signature.replace('Typed: ', '')
+          : (s.name || 'Signature');
+        lastPage.drawText(safeText(sigText), {
+          x: sigX,
+          y: sigY + 12,
+          size: 11,
+          font: fontItalic,
+          color: C_GREEN,
+        });
+      }
+      lastPage.drawText(safeText(`${s.name || 'Signer'} • ${new Date().toLocaleDateString('en-US')}`), {
+        x: sigX,
+        y: sigY,
         size: 7.5,
         font: fontRegular,
         color: C_MUTED,
       });
     }
-
-    y -= (blockHeight + 16);
   }
-
-  // Legal Footer
-  const footerY = margin + 14;
-  page.drawLine({
-    start: { x: margin, y: footerY + 12 },
-    end: { x: width - margin, y: footerY + 12 },
-    thickness: 0.5,
-    color: C_LINE,
-  });
-
-  page.drawText('MAAC AI Sign Electronic Execution Record | Tamper-evident SHA-256 audit log attached to root registry.', {
-    x: margin,
-    y: footerY,
-    size: 7.5,
-    font: fontRegular,
-    color: C_MUTED,
-  });
 
   const finalPdfBytes = await pdfDoc.save({ useObjectStreams: false });
   const finalBuffer = Buffer.from(finalPdfBytes);
