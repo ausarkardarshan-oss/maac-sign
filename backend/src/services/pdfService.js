@@ -58,9 +58,10 @@ function safeText(str) {
 
 /**
  * PHASE 5: Final Signed PDF Generator
- * Stamps/appends an official Execution & Signature Record page to the original PDF.
+ * Stamps signing fields directly at configured positions on original document pages,
+ * and appends an official Execution & Signature Record page.
  */
-async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, documentId }) {
+async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, documentId, fields = [] }) {
   if (!originalPdfBuffer || originalPdfBuffer.length < 8) {
     throw new Error('Invalid original PDF buffer');
   }
@@ -72,9 +73,6 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
     const loadedDoc = await PDFDocument.load(originalPdfBuffer, { ignoreEncryption: true });
     const count = loadedDoc.getPageCount();
     if (count > 0) {
-      // Create a clean, newly indexed PDFDocument and copy pages into it.
-      // This normalizes object IDs, strips corrupted incremental update revisions,
-      // and guarantees 100% standard PDF compliance across all viewers (Chrome/Edge PDFium, Acrobat, Preview, etc.)
       pdfDoc = await PDFDocument.create();
       const pageIndices = loadedDoc.getPageIndices();
       const copiedPages = await pdfDoc.copyPages(loadedDoc, pageIndices);
@@ -88,7 +86,6 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
   }
 
   if (!copiedSuccessfully) {
-    // If the PDF file is a mock or minimal stub without page structures, create a clean base document
     pdfDoc = await PDFDocument.create();
     const coverPage = pdfDoc.addPage([612, 792]);
     const fRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -119,6 +116,185 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+
+  // Render configured fields directly onto their designated document pages
+  if (Array.isArray(fields) && fields.length > 0) {
+    const pages = pdfDoc.getPages();
+    for (const f of fields) {
+      const pageIndex = (Number(f.page) || 1) - 1;
+      if (pageIndex < 0 || pageIndex >= pages.length) continue;
+      const targetPage = pages[pageIndex];
+      const { width: pWidth, height: pHeight } = targetPage.getSize();
+
+      const fieldX = Math.max(0, (Number(f.x) || 0) * pWidth);
+      const fieldW = Math.max(20, (Number(f.width) || 0.1) * pWidth);
+      const fieldH = Math.max(14, (Number(f.height) || 0.04) * pHeight);
+      const fieldY = Math.max(0, pHeight - ((Number(f.y) || 0) * pHeight) - fieldH);
+
+      const signer = (signers && signers.find((s) => s.recipient_id === f.recipient_id)) || (signers && signers[0]) || {};
+
+      if (['signature', 'initials', 'initial'].includes(f.type)) {
+        let drawn = false;
+        if (signer.signature && typeof signer.signature === 'string' && signer.signature.startsWith('data:image/png;base64,')) {
+          try {
+            const base64Data = signer.signature.replace(/^data:image\/png;base64,/, '');
+            const imgBuffer = Buffer.from(base64Data, 'base64');
+            const embeddedImg = await pdfDoc.embedPng(imgBuffer);
+            const imgDims = embeddedImg.scaleToFit(fieldW - 4, fieldH - 4);
+            targetPage.drawImage(embeddedImg, {
+              x: fieldX + (fieldW - imgDims.width) / 2,
+              y: fieldY + (fieldH - imgDims.height) / 2,
+              width: imgDims.width,
+              height: imgDims.height,
+            });
+            drawn = true;
+          } catch {}
+        }
+        if (!drawn) {
+          const sigText = (signer.signature && signer.signature.startsWith('Typed: '))
+            ? signer.signature.replace('Typed: ', '')
+            : (signer.name || (f.type === 'initials' || f.type === 'initial' ? 'Initial' : 'Signature'));
+          targetPage.drawText(safeText(sigText), {
+            x: fieldX + 4,
+            y: fieldY + fieldH / 2 - 4,
+            size: Math.min(13, Math.max(8, fieldH * 0.55)),
+            font: fontItalic,
+            color: C_GREEN,
+          });
+        }
+      } else if (f.type === 'stamp') {
+        let stampDrawn = false;
+        if (f.value && typeof f.value === 'string' && f.value.startsWith('data:image/')) {
+          try {
+            const isPng = f.value.startsWith('data:image/png');
+            const b64 = f.value.replace(/^data:image\/\w+;base64,/, '');
+            const buf = Buffer.from(b64, 'base64');
+            const emb = isPng ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+            const dims = emb.scaleToFit(fieldW - 4, fieldH - 4);
+            targetPage.drawImage(emb, {
+              x: fieldX + (fieldW - dims.width) / 2,
+              y: fieldY + (fieldH - dims.height) / 2,
+              width: dims.width,
+              height: dims.height,
+            });
+            stampDrawn = true;
+          } catch {}
+        }
+        if (!stampDrawn) {
+          targetPage.drawRectangle({
+            x: fieldX,
+            y: fieldY,
+            width: fieldW,
+            height: fieldH,
+            borderColor: C_GREEN,
+            borderWidth: 1.5,
+            color: rgb(0.95, 0.98, 0.96),
+          });
+          const stampText = f.value || '★ OFFICIAL STAMP ★';
+          targetPage.drawText(safeText(String(stampText)), {
+            x: fieldX + 4,
+            y: fieldY + fieldH / 2 - 4,
+            size: Math.min(9, Math.max(6, fieldH * 0.45)),
+            font: fontBold,
+            color: C_GREEN,
+          });
+        }
+      } else if (f.type === 'image') {
+        let imgDrawn = false;
+        if (f.value && typeof f.value === 'string' && f.value.startsWith('data:image/')) {
+          try {
+            const isPng = f.value.startsWith('data:image/png');
+            const b64 = f.value.replace(/^data:image\/\w+;base64,/, '');
+            const buf = Buffer.from(b64, 'base64');
+            const emb = isPng ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+            const dims = emb.scaleToFit(fieldW - 2, fieldH - 2);
+            targetPage.drawImage(emb, {
+              x: fieldX + (fieldW - dims.width) / 2,
+              y: fieldY + (fieldH - dims.height) / 2,
+              width: dims.width,
+              height: dims.height,
+            });
+            imgDrawn = true;
+          } catch {}
+        }
+        if (!imgDrawn) {
+          targetPage.drawRectangle({
+            x: fieldX,
+            y: fieldY,
+            width: fieldW,
+            height: fieldH,
+            borderColor: C_DARK,
+            borderWidth: 1,
+            color: rgb(0.96, 0.96, 0.96),
+          });
+          targetPage.drawText(safeText(f.label || 'Image'), {
+            x: fieldX + 4,
+            y: fieldY + fieldH / 2 - 4,
+            size: Math.min(9, Math.max(7, fieldH * 0.4)),
+            font: fontRegular,
+            color: C_MUTED,
+          });
+        }
+      } else if (f.type === 'checkbox' || f.type === 'checkbox_group') {
+        const isChecked = f.value === true || f.value === 'true' || f.value === '1';
+        targetPage.drawRectangle({
+          x: fieldX,
+          y: fieldY,
+          width: Math.min(fieldW, fieldH),
+          height: Math.min(fieldW, fieldH),
+          borderColor: C_DARK,
+          borderWidth: 1,
+          color: rgb(1, 1, 1),
+        });
+        if (isChecked) {
+          targetPage.drawText('X', {
+            x: fieldX + 3,
+            y: fieldY + 2,
+            size: Math.min(10, fieldH * 0.7),
+            font: fontBold,
+            color: C_GREEN,
+          });
+        }
+      } else if (f.type === 'radio') {
+        const isChecked = f.value === true || f.value === 'true' || f.value === '1';
+        const rad = Math.min(fieldW, fieldH) / 2;
+        targetPage.drawCircle({
+          x: fieldX + rad,
+          y: fieldY + rad,
+          size: rad,
+          borderColor: C_DARK,
+          borderWidth: 1,
+          color: rgb(1, 1, 1),
+        });
+        if (isChecked) {
+          targetPage.drawCircle({
+            x: fieldX + rad,
+            y: fieldY + rad,
+            size: rad * 0.5,
+            color: C_GREEN,
+          });
+        }
+      } else {
+        let textVal = f.value || '';
+        if (!textVal) {
+          if (['date_signed', 'sign_date'].includes(f.type)) textVal = new Date().toLocaleDateString('en-US');
+          else if (['name', 'full_name'].includes(f.type)) textVal = signer.name || '';
+          else if (f.type === 'email') textVal = signer.email || '';
+          else if (f.type === 'company') textVal = signer.company || '';
+          else if (['title', 'job_title'].includes(f.type)) textVal = signer.title || '';
+        }
+        if (textVal) {
+          targetPage.drawText(safeText(String(textVal)), {
+            x: fieldX + 3,
+            y: fieldY + fieldH / 2 - 4,
+            size: Math.min(10, Math.max(7, fieldH * 0.55)),
+            font: fontRegular,
+            color: C_BLACK,
+          });
+        }
+      }
+    }
+  }
 
   // Add a dedicated Signature Execution page
   const page = pdfDoc.addPage([612, 792]); // Standard US Letter

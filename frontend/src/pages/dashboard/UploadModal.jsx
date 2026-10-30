@@ -54,14 +54,22 @@ export function UploadModal({ onClose, onSuccess }) {
         Choose a PDF file (max 6 MB). Files are stored securely in your private workspace.
       </p>
       <form onSubmit={handleSubmit}>
-        <label
+        <div
           className="filedrop"
-          htmlFor="upload-file"
           onClick={() => fileRef.current?.click()}
-          style={{ cursor: 'pointer' }}
         >
-          ▤<br /><br />
-          {file ? file.name : 'Click to choose a PDF document'}
+          <div className="filedrop-icon">▤</div>
+          {file ? (
+            <>
+              <strong>{file.name}</strong>
+              <small>{(file.size / 1024).toFixed(0)} KB</small>
+            </>
+          ) : (
+            <>
+              <strong>Click to choose a PDF document</strong>
+              <small>or drag & drop here — max 6 MB</small>
+            </>
+          )}
           <input
             id="upload-file"
             ref={fileRef}
@@ -70,7 +78,7 @@ export function UploadModal({ onClose, onSuccess }) {
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />
-        </label>
+        </div>
 
         <div className="formfield">
           <label htmlFor="upload-name">Document name</label>

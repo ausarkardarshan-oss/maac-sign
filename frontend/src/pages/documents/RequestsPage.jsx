@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { signingService } from '../../services/signingService.js';
 import { toast } from '../../components/common/Toast.jsx';
 import { documentService } from '../../services/documentService.js';
-import SendModal from '../dashboard/SendModal.jsx';
+import SendWorkflow from '../../components/workflow/SendWorkflow.jsx';
+import DocumentDetailModal from '../../components/modals/DocumentDetailModal.jsx';
 
 function StatusBadge({ status }) {
   const cls = status?.replace(/_/g, '').replace(/\s+/g, '').toLowerCase();
@@ -14,6 +15,7 @@ export function RequestsPage() {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSend, setShowSend] = useState(false);
+  const [selectedDocId, setSelectedDocId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
   const load = async () => {
@@ -38,6 +40,7 @@ export function RequestsPage() {
     try {
       await signingService.resendRequest(r.id);
       toast(`Reminder email sent to recipient via Brevo SMTP`);
+      load();
     } catch (err) {
       toast(err.message || 'Failed to resend reminder');
     } finally {
@@ -97,8 +100,8 @@ export function RequestsPage() {
               <tr>
                 <th>Document</th>
                 <th>Subject</th>
-                <th>Recipients</th>
-                <th>Status</th>
+                <th>Recipients & Status</th>
+                <th>Overall Status</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -109,13 +112,41 @@ export function RequestsPage() {
               ) : (
                 requests.map((r) => (
                   <tr key={r.id}>
-                    <td><strong>▤ &nbsp;{r.document}</strong></td>
+                    <td
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedDocId(r.document_id)}
+                      title="Click to view details and status timeline"
+                    >
+                      <strong>▤ &nbsp;{r.document}</strong>
+                    </td>
                     <td>{r.subject}</td>
-                    <td>{r.recipients}</td>
+                    <td>
+                      {Array.isArray(r.recipients) && r.recipients.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {r.recipients.map((rec, idx) => (
+                            <div key={rec.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+                              <span>#{rec.order || idx + 1} <strong>{rec.name}</strong></span>
+                              <span style={{ color: 'var(--muted)', fontSize: '11px' }}>({rec.email})</span>
+                              <span className={`status ${rec.status === 'signed' ? 'completed' : rec.status}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                {rec.status === 'signed' ? 'Signed' : rec.viewed_at ? 'Viewed' : 'Pending'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span>{r.recipients_summary || 'No recipients'}</span>
+                      )}
+                    </td>
                     <td><StatusBadge status={r.status} /></td>
                     <td>{r.created?.slice(0, 10)}</td>
                     <td>
                       <div className="btngroup">
+                        <button
+                          className="btn primary"
+                          onClick={() => setSelectedDocId(r.document_id)}
+                        >
+                          Details
+                        </button>
                         {r.status === 'pending' && (
                           <>
                             <button
@@ -140,7 +171,7 @@ export function RequestsPage() {
                           <>
                             <a
                               href={documentService.downloadSignedUrl(r.document_id)}
-                              className="btn primary"
+                              className="btn"
                               download={`${r.document}_signed.pdf`}
                               target="_blank"
                               rel="noreferrer"
@@ -174,10 +205,18 @@ export function RequestsPage() {
       </div>
 
       {showSend && (
-        <SendModal
-          docs={docs.filter((d) => d.status === 'draft')}
+        <SendWorkflow
+          docs={docs}
           onClose={() => setShowSend(false)}
           onSuccess={() => { setShowSend(false); load(); }}
+        />
+      )}
+
+      {selectedDocId && (
+        <DocumentDetailModal
+          docId={selectedDocId}
+          onClose={() => setSelectedDocId(null)}
+          onRefresh={load}
         />
       )}
     </div>

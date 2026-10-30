@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { Document, Audit, Certificate, Notification } = require('../models');
+const { Document, Audit, Certificate, Notification, Request, Recipient } = require('../models');
 const { STORAGE_DIR } = require('../config/database');
 const { uid, now } = require('../utils/crypto');
 const { appendAudit } = require('./auditService');
@@ -90,6 +90,57 @@ async function listDocuments(userId, query) {
  */
 async function getDocument(documentId, userId) {
   return Document.findOne({ _id: documentId, owner_id: userId });
+}
+
+/**
+ * Get full document details including signing request, recipient timeline, and audit history.
+ */
+async function getDocumentDetails(documentId, userId) {
+  const doc = await Document.findOne({ _id: documentId, owner_id: userId });
+  if (!doc) return null;
+
+  const req = await Request.findOne({ document_id: documentId }).sort({ created: -1 });
+  let recipients = [];
+  if (req) {
+    recipients = await Recipient.find({ request_id: req._id }).sort({ order: 1 });
+  }
+  const audit = await getAuditTrail(documentId, userId);
+
+  return {
+    id: doc.id,
+    name: doc.name,
+    mime: doc.mime,
+    status: doc.status,
+    sha256: doc.sha256,
+    final_sha256: doc.final_sha256,
+    signed_filename: doc.signed_filename,
+    certificate_id: doc.certificate_id,
+    created: doc.created,
+    updated: doc.updated,
+    completed_at: doc.completed_at,
+    request: req
+      ? {
+          id: req.id,
+          subject: req.subject,
+          message: req.message,
+          sequential_signing: req.sequential_signing,
+          status: req.status,
+          created: req.created,
+          completed: req.completed,
+        }
+      : null,
+    recipients: recipients.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      order: r.order,
+      status: r.status,
+      signed: r.signed,
+      viewed_at: r.viewed_at,
+    })),
+    audit,
+  };
 }
 
 /**
@@ -249,6 +300,7 @@ module.exports = {
   uploadDocument,
   listDocuments,
   getDocument,
+  getDocumentDetails,
   renameDocument,
   deleteDocument,
   getDocumentFile,

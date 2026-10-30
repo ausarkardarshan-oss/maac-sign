@@ -756,13 +756,48 @@ td strong {
 
 /* ── File drop ───────────────────────────────────────────── */
 .filedrop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
   border: 2px dashed #b8d9ca;
   border-radius: 13px;
-  padding: 30px;
+  padding: 32px 20px;
   text-align: center;
   background: #f8fdf9;
   color: var(--green);
   cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  margin-bottom: 16px;
+}
+
+.filedrop:hover,
+.filedrop.dragging {
+  border-color: var(--green);
+  background: #eef8f4;
+}
+
+.filedrop-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 10px;
+  color: var(--green);
+}
+
+.filedrop strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.filedrop small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .filedrop input {
@@ -1029,6 +1064,24 @@ body.dark .formfield select {
 body.dark .quick {
   background: #1b2522;
   border-color: #33453c;
+}
+
+body.dark .wiz-editor-sidebar {
+  background: #151f1c;
+  border-color: #33453c;
+}
+
+body.dark .wiz-standard-fields-header {
+  color: #e5eee9;
+}
+
+body.dark .wiz-field-btn {
+  background: #23312b;
+  border-color: #43574a;
+}
+
+body.dark .wiz-field-btn-label {
+  color: #e5eee9;
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
@@ -1629,4 +1682,823 @@ body.dark .quick {
 
 .notif-footer-btn:hover {
   color: #172a2a;
+}
+
+/* ── Action Menu Dropdown (+ New) ─────────────────────────────────────────── */
+.action-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 260px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  padding: 8px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: fadeInDown 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s ease, transform 0.1s ease;
+  color: var(--ink);
+}
+
+.action-menu-item:hover {
+  background: #f3f8f6;
+}
+
+.action-menu-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #eef6f3;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.action-menu-item b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.action-menu-item small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ── Wizard Overlay & Dialog ──────────────────────────────────────────────── */
+.wiz-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(14, 26, 24, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+  animation: fadeIn 0.18s ease;
+}
+
+.wiz-panel {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+  width: 100%;
+  max-width: 680px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  overflow: hidden;
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wiz-panel-wide {
+  max-width: 1020px;
+  height: 90vh;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.wiz-close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wiz-close:hover {
+  background: #f0f4f2;
+  color: var(--ink);
+}
+
+/* ── Wizard Step Indicator ─────────────────────────────────────────────────── */
+.wiz-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--border);
+  background: #fafcfb;
+}
+
+.wiz-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  position: relative;
+}
+
+.wiz-step.active {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.wiz-step.done {
+  color: var(--accent);
+}
+
+.wiz-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.wiz-step.active .wiz-step-num {
+  border-color: var(--green);
+  background: var(--green);
+  color: white;
+}
+
+.wiz-step.done .wiz-step-num {
+  border-color: var(--accent);
+  background: #eef8f4;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.wiz-step-line {
+  width: 36px;
+  height: 1.5px;
+  background: var(--border);
+  margin: 0 10px;
+}
+
+.wiz-step.done + .wiz-step .wiz-step-line,
+.wiz-step.done .wiz-step-line {
+  background: var(--accent);
+}
+
+/* ── Wizard Body & Tabs ────────────────────────────────────────────────────── */
+.wiz-body {
+  padding: 24px 32px 30px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.wiz-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wiz-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+
+.wiz-tab {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: all 0.15s ease;
+}
+
+.wiz-tab.active {
+  border-color: var(--green);
+  background: #f1f8f5;
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* ── PDF Field Editor Layout ───────────────────────────────────────────────── */
+.wiz-editor {
+  display: flex;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.wiz-editor-sidebar {
+  width: 320px;
+  border-right: 1px solid var(--border);
+  background: #fbfdfc;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.wiz-standard-fields-header {
+  font-size: 15px;
+  font-weight: 700;
+  color: #172a24;
+  text-align: center;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.2px;
+}
+
+.wiz-standard-fields-divider {
+  height: 2px;
+  background: #17654a;
+  border: none;
+  margin: 0 0 14px 0;
+  width: 100%;
+}
+
+.wiz-field-palette {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 8px;
+  margin-bottom: 18px;
+}
+
+.wiz-field-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 1px solid #7d9387;
+  background: #ffffff;
+  border-radius: 4px;
+  height: 38px;
+  cursor: grab;
+  text-align: left;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--ink);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  user-select: none;
+}
+
+.wiz-field-btn:active {
+  cursor: grabbing;
+}
+
+.wiz-field-btn:hover {
+  border-color: #17654a;
+  box-shadow: 0 2px 6px rgba(23, 101, 74, 0.18);
+  transform: translateY(-1px);
+}
+
+.wiz-field-btn-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wiz-field-drag-dots {
+  display: flex;
+  align-items: center;
+  color: #7b8e84;
+  flex-shrink: 0;
+}
+
+.wiz-field-btn-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #192c25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wiz-field-btn-badge {
+  width: 32px;
+  height: 100%;
+  background: #17654a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.wiz-field-btn-badge svg {
+  display: block;
+}
+
+.wiz-field-inspector {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.wiz-editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #edf2f0;
+  overflow: hidden;
+}
+
+.wiz-pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: white;
+  border-bottom: 1px solid var(--border);
+}
+
+.wiz-pdf-canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.wiz-editor-nav {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  left: 250px;
+  background: white;
+  border-top: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 20;
+}
+
+/* ── Timeline Styles ───────────────────────────────────────────────────────── */
+.timeline-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #fafcfb;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.15s ease;
+}
+
+.timeline-row.done {
+  background: #f6fbf8;
+  border-color: #c7e6da;
+}
+
+.timeline-row.viewed {
+  background: #f4f8fd;
+  border-color: #c7ddf7;
+}
+
+.timeline-row.waiting {
+  background: #fffdf5;
+  border-color: #f7e6b8;
+}
+
+.timeline-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.timeline-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Interactive Recipient Cards & Workflow Styles ───────────────────────── */
+.wiz-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 22px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wiz-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wiz-section-count {
+  background: #eef6f3;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+/* Modern iOS-style toggle switch */
+.wiz-switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.wiz-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: #dfe7e3;
+  border-radius: 20px;
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wiz-switch.active {
+  background: var(--green);
+}
+
+.wiz-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wiz-switch.active .wiz-switch-thumb {
+  transform: translateX(18px);
+}
+
+/* Sequential order flow preview banner */
+.wiz-flow-diagram {
+  background: linear-gradient(135deg, #f3f9f6 0%, #edf6f2 100%);
+  border: 1px solid #cce5dc;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.wiz-flow-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.wiz-flow-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wiz-flow-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1px solid #b8dfd1;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.wiz-flow-arrow {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Recipient List & Cards */
+.wiz-recipients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.wiz-recipient-card {
+  background: white;
+  border: 1.5px solid #dfe9e4;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.wiz-recipient-card:hover {
+  border-color: #b8d9ca;
+  box-shadow: 0 4px 12px rgba(18, 133, 92, 0.06);
+}
+
+.wiz-recipient-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.wiz-recipient-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wiz-recipient-order-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+}
+
+.wiz-recipient-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .wiz-recipient-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wiz-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.wiz-input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.wiz-input-wrapper input {
+  width: 100%;
+  padding: 10px 12px 10px 34px !important;
+  border: 1px solid #dfe9e4 !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  color: var(--ink);
+  background: #fbfdfc !important;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.wiz-input-wrapper input:focus {
+  border-color: var(--green) !important;
+  background: white !important;
+  box-shadow: 0 0 0 3px rgba(20, 134, 108, 0.12) !important;
+}
+
+.wiz-recipient-role-select {
+  padding: 10px 14px;
+  border: 1px solid #dfe9e4;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #fbfdfc;
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
+  height: 40px;
+}
+
+.wiz-recipient-role-select:focus {
+  border-color: var(--green);
+}
+
+/* Action buttons on card */
+.wiz-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wiz-icon-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #dfe9e4;
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wiz-icon-btn:hover:not(:disabled) {
+  border-color: var(--green);
+  color: var(--green);
+  background: #f3f8f6;
+}
+
+.wiz-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.wiz-icon-btn.danger:hover:not(:disabled) {
+  border-color: #d34b42;
+  color: #d34b42;
+  background: #fff5f4;
+}
+
+/* Add buttons toolbar */
+.wiz-quick-btns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.wiz-add-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1.5px dashed #b8d9ca;
+  background: #f9fdfb;
+  border-radius: 9px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wiz-add-card-btn:hover {
+  background: #eef8f4;
+  border-color: var(--green);
+  transform: translateY(-1px);
+}
+
+.wiz-add-self-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid #dfe9e4;
+  background: white;
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wiz-add-self-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: #fbfdfc;
+}
+
+/* Accordion for More Settings */
+.wiz-accordion {
+  border: 1px solid #dfe9e4;
+  border-radius: 10px;
+  background: #fbfdfc;
+  margin-top: 18px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.wiz-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+}
+
+.wiz-accordion-toggle:hover {
+  background: #f5f9f7;
+}
+
+.wiz-accordion-content {
+  padding: 16px;
+  border-top: 1px solid #edf3f0;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }

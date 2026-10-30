@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { documentService } from '../../services/documentService.js';
 import { toast } from '../../components/common/Toast.jsx';
-import Modal from '../../components/modals/Modal.jsx';
-import UploadModal from './UploadModal.jsx';
-import SendModal from './SendModal.jsx';
+import SendWorkflow from '../../components/workflow/SendWorkflow.jsx';
+import SelfSignWorkflow from '../../components/workflow/SelfSignWorkflow.jsx';
 
 function StatusBadge({ status }) {
   const cls = status?.replace(/_/g, '').replace(/\s+/g, '').toLowerCase();
@@ -18,7 +17,7 @@ export function DashboardPage() {
   const [stats, setStats] = useState({ total: 0, statuses: [] });
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // 'upload' | 'send'
+  const [modal, setModal] = useState(null); // 'send' | 'selfsign' | 'menu'
 
   const load = async () => {
     try {
@@ -37,12 +36,10 @@ export function DashboardPage() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
-  const countByStatus = (s) =>
-    docs.filter((d) => d.status === s).length;
+  const countByStatus = (s) => docs.filter((d) => d.status === s).length;
 
   const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
@@ -56,7 +53,42 @@ export function DashboardPage() {
           <p className="subtitle">Here&rsquo;s what&rsquo;s happening with your documents today.</p>
         </div>
         <div className="btngroup">
-          <button className="btn primary" onClick={() => setModal('send')}>＋ New signature request</button>
+          {/* Action menu button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              id="action-menu-btn"
+              className="btn primary"
+              onClick={() => setModal(modal === 'menu' ? null : 'menu')}
+            >
+              ＋ New
+            </button>
+            {modal === 'menu' && (
+              <div className="action-menu" id="action-menu-dropdown">
+                <button
+                  className="action-menu-item"
+                  id="action-send-sigs"
+                  onClick={() => setModal('send')}
+                >
+                  <span className="action-menu-icon">➤</span>
+                  <div>
+                    <b>Send for signatures</b>
+                    <small>Request signatures from others</small>
+                  </div>
+                </button>
+                <button
+                  className="action-menu-item"
+                  id="action-sign-yourself"
+                  onClick={() => setModal('selfsign')}
+                >
+                  <span className="action-menu-icon">✒</span>
+                  <div>
+                    <b>Sign yourself</b>
+                    <small>Upload and sign a document yourself</small>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -64,7 +96,7 @@ export function DashboardPage() {
       <div className="metrics">
         {[
           { label: 'Total documents', value: stats.total, icon: '▤' },
-          { label: 'Awaiting signatures', value: countByStatus('in_progress') + countByStatus('pending'), icon: '◷' },
+          { label: 'Awaiting signatures', value: countByStatus('in_progress'), icon: '◷' },
           { label: 'Completed', value: countByStatus('completed'), icon: '✓' },
           { label: 'Drafts', value: countByStatus('draft'), icon: '▧' },
         ].map((m) => (
@@ -85,15 +117,15 @@ export function DashboardPage() {
             <h3>Quick actions</h3>
           </div>
           <div className="quickgrid">
-            <button className="quick" onClick={() => setModal('send')}>
+            <button className="quick" id="quick-send-sigs" onClick={() => setModal('send')}>
               <div className="symbol">➤</div>
               <b>Send for signatures</b>
               <small>Prepare and request a signature</small>
             </button>
-            <button className="quick" onClick={() => setModal('upload')}>
-              <div className="symbol">▤</div>
-              <b>Upload document</b>
-              <small>Upload a PDF to your workspace</small>
+            <button className="quick" id="quick-sign-yourself" onClick={() => setModal('selfsign')}>
+              <div className="symbol">✒</div>
+              <b>Sign yourself</b>
+              <small>Upload and sign a document</small>
             </button>
           </div>
         </div>
@@ -161,18 +193,24 @@ export function DashboardPage() {
       </div>
 
       {/* Modals */}
-      {modal === 'upload' && (
-        <UploadModal
+      {modal === 'send' && (
+        <SendWorkflow
+          docs={docs}
           onClose={() => setModal(null)}
           onSuccess={() => { setModal(null); load(); }}
         />
       )}
-      {modal === 'send' && (
-        <SendModal
-          docs={docs.filter((d) => d.status === 'draft')}
+      {modal === 'selfsign' && (
+        <SelfSignWorkflow
+          docs={docs}
           onClose={() => setModal(null)}
           onSuccess={() => { setModal(null); load(); }}
         />
+      )}
+
+      {/* Click outside to close action menu */}
+      {modal === 'menu' && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 0 }} onClick={() => setModal(null)} />
       )}
     </div>
   );

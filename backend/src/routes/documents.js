@@ -5,6 +5,7 @@ const {
   uploadDocument,
   listDocuments,
   getDocument,
+  getDocumentDetails,
   renameDocument,
   deleteDocument,
   getDocumentFile,
@@ -61,7 +62,7 @@ router.get('/stats', async (req, res, next) => {
 // GET /api/documents/:id
 router.get('/:id', async (req, res, next) => {
   try {
-    const doc = await getDocument(req.params.id, req.user.id);
+    const doc = await getDocumentDetails(req.params.id, req.user.id);
     if (!doc) return res.status(404).json({ error: 'Document not found' });
     res.json(doc);
   } catch (err) {
@@ -152,4 +153,46 @@ router.get('/:id/audit', async (req, res, next) => {
   }
 });
 
+// POST /api/documents/:id/email — email the completed document
+router.post('/:id/email', async (req, res, next) => {
+  try {
+    const { emailDocument } = require('../services/signingService');
+    const { email, name } = req.body;
+    const result = await emailDocument({
+      userId: req.user.id,
+      documentId: req.params.id,
+      toEmail: email,
+      toName: name,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/documents/:id/self-sign — self-sign workflow
+router.post('/:id/self-sign', async (req, res, next) => {
+  try {
+    const { selfSign } = require('../services/signingService');
+    const { signature, signatureType, consent, fieldValues } = req.body;
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'Web Browser';
+
+    const result = await selfSign({
+      userId: req.user.id,
+      documentId: req.params.id,
+      signature,
+      signatureType,
+      consent,
+      fieldValues: fieldValues || {},
+      ipAddress,
+      userAgent,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
+

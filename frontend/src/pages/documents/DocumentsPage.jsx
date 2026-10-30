@@ -4,7 +4,8 @@ import { documentService } from '../../services/documentService.js';
 import { toast } from '../../components/common/Toast.jsx';
 import Modal from '../../components/modals/Modal.jsx';
 import UploadModal from '../dashboard/UploadModal.jsx';
-import SendModal from '../dashboard/SendModal.jsx';
+import SendWorkflow from '../../components/workflow/SendWorkflow.jsx';
+import DocumentDetailModal from '../../components/modals/DocumentDetailModal.jsx';
 
 const ALL_FILTERS = ['All', 'in_progress', 'completed', 'draft', 'recalled', 'declined'];
 const FILTER_LABELS = {
@@ -250,16 +251,19 @@ export function DocumentsPage({ searchQuery: propQuery }) {
               ) : (
                 filtered.map((d) => (
                   <tr key={d.id}>
-                    <td><strong>▤ &nbsp;{d.name}</strong></td>
+                    <td style={{ cursor: 'pointer' }} onClick={() => setModal({ type: 'detail', doc: d })} title="Click to view details and status timeline">
+                      <strong>▤ &nbsp;{d.name}</strong>
+                    </td>
                     <td><StatusBadge status={d.status} /></td>
                     <td>{d.created?.slice(0, 10)}</td>
                     <td>
                       <div className="btngroup">
+                        <button className="btn primary" onClick={() => setModal({ type: 'detail', doc: d })}>Details</button>
                         {d.status === 'completed' && d.signed_filename ? (
                           <>
                             <a
                               href={documentService.downloadSignedUrl(d.id)}
-                              className="btn primary"
+                              className="btn"
                               download={`${d.name}_signed.pdf`}
                               target="_blank"
                               rel="noreferrer"
@@ -279,16 +283,6 @@ export function DocumentsPage({ searchQuery: propQuery }) {
                                 Certificate
                               </a>
                             )}
-                            <a
-                              href={documentService.downloadUrl(d.id)}
-                              className="btn"
-                              download={`${d.name}.pdf`}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Download original uploaded document"
-                            >
-                              Original
-                            </a>
                           </>
                         ) : (
                           <a
@@ -317,11 +311,14 @@ export function DocumentsPage({ searchQuery: propQuery }) {
       </div>
 
       {/* Modals */}
+      {modal?.type === 'detail' && (
+        <DocumentDetailModal docId={modal.doc.id} onClose={() => setModal(null)} onRefresh={load} />
+      )}
       {modal?.type === 'upload' && (
         <UploadModal onClose={() => setModal(null)} onSuccess={() => { setModal(null); load(); }} />
       )}
       {modal?.type === 'send' && (
-        <SendModal docs={docs.filter((d) => d.status === 'draft')} onClose={() => setModal(null)} onSuccess={() => { setModal(null); load(); }} />
+        <SendWorkflow docs={docs} onClose={() => setModal(null)} onSuccess={() => { setModal(null); load(); }} />
       )}
       {modal?.type === 'audit' && (
         <AuditModal docId={modal.doc.id} onClose={() => setModal(null)} />

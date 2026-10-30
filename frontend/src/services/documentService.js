@@ -12,6 +12,8 @@ export const documentService = {
   certificateUrl: (id) => `/api/documents/${id}/certificate`,
   digitalSignatureInfo: (id) => api.get(`/documents/${id}/digital-signature`),
   audit: (id) => api.get(`/documents/${id}/audit`),
+  email: (id, { email, name }) => api.post(`/documents/${id}/email`, { email, name }),
+  selfSign: (id, data) => api.post(`/documents/${id}/self-sign`, data),
 };
 
 export default documentService;

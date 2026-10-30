@@ -8,7 +8,7 @@ const Audit = require('./Audit');
 const Template = require('./Template');
 const Form = require('./Form');
 const Certificate = require('./Certificate');
-
+const SigningField = require('./SigningField');
 const Notification = require('./Notification');
 
 module.exports = {
@@ -21,5 +21,6 @@ module.exports = {
   Template,
   Form,
   Certificate,
+  SigningField,
   Notification,
 };
