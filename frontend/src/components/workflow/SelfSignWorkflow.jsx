@@ -34,6 +34,91 @@ export function SelfSignWorkflow({ docs: initialDocs, onClose, onSuccess }) {
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
 
+  // Document placement state
+  const [sigPos, setSigPos] = useState({ x: 0.43, y: 0.58, w: 0.28, h: 0.06 });
+  const [sigPage, setSigPage] = useState(1);
+  const [pdfPages, setPdfPages] = useState(1);
+  const [pdfLoaded, setPdfLoaded] = useState(false);
+  const pdfCanvasRef = useRef(null);
+  const pdfContainerRef = useRef(null);
+  const pdfDocRef = useRef(null);
+  const renderTaskRef = useRef(null);
+
+  // Load PDF for live placement preview
+  useEffect(() => {
+    if (step !== 2 || !docId) return;
+    let cancelled = false;
+
+    const loadPdf = async () => {
+      try {
+        if (!window.pdfjsLib) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        if (cancelled) return;
+
+        const docUrl = `/api/documents/${docId}/download`;
+        const pdf = await window.pdfjsLib.getDocument({ url: docUrl, withCredentials: true }).promise;
+        if (cancelled) return;
+
+        pdfDocRef.current = pdf;
+        setPdfPages(pdf.numPages);
+        setSigPage(pdf.numPages);
+        setPdfLoaded(true);
+      } catch (err) {
+        console.warn('PDF preview load failed:', err);
+      }
+    };
+
+    loadPdf();
+    return () => { cancelled = true; };
+  }, [step, docId]);
+
+  // Render current page onto pdfCanvasRef
+  useEffect(() => {
+    if (!pdfLoaded || !pdfDocRef.current || !pdfCanvasRef.current) return;
+
+    const renderPage = async () => {
+      if (renderTaskRef.current) {
+        try { renderTaskRef.current.cancel(); } catch {}
+      }
+      try {
+        const page = await pdfDocRef.current.getPage(sigPage);
+        const viewport = page.getViewport({ scale: 1 });
+        const containerWidth = pdfContainerRef.current?.clientWidth || 560;
+        const displayScale = Math.min((containerWidth - 20) / viewport.width, 1.2);
+        const scaledViewport = page.getViewport({ scale: displayScale });
+
+        const canvas = pdfCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+
+        const task = page.render({ canvasContext: ctx, viewport: scaledViewport });
+        renderTaskRef.current = task;
+        await task.promise;
+      } catch {}
+    };
+
+    renderPage();
+  }, [pdfLoaded, sigPage]);
+
+  const handlePdfClick = (e) => {
+    if (!pdfCanvasRef.current) return;
+    const rect = pdfCanvasRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    const normX = Math.max(0.02, Math.min(0.72, (clickX - (sigPos.w * rect.width) / 2) / rect.width));
+    const normY = Math.max(0.02, Math.min(0.92, (clickY - (sigPos.h * rect.height) / 2) / rect.height));
+    setSigPos((prev) => ({ ...prev, x: normX, y: normY }));
+  };
+
   const handleSignatureUpload = (file, shouldRemoveBg = removeBg) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -193,7 +278,22 @@ export function SelfSignWorkflow({ docs: initialDocs, onClose, onSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ signature: sigData, signatureType: signType, consent: true }),
+        body: JSON.stringify({
+          signature: sigData,
+          signatureType: signType,
+          consent: true,
+          fields: [
+            {
+              page: sigPage,
+              type: 'signature',
+              label: 'Signature',
+              x: sigPos.x,
+              y: sigPos.y,
+              width: sigPos.w,
+              height: sigPos.h,
+            },
+          ],
+        }),
       }).then(async (r) => {
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
@@ -435,6 +535,98 @@ export function SelfSignWorkflow({ docs: initialDocs, onClose, onSuccess }) {
                 )}
               </div>
             )}
+
+            {/* Live Placement on Document */}
+            <div className="card" style={{ marginTop: '20px', padding: '16px' }} ref={pdfContainerRef}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--ink)' }}>Signature Position on Document</h4>
+                  <small style={{ color: 'var(--muted)' }}>Click anywhere on the document preview below to place or reposition your signature</small>
+                </div>
+                {pdfPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                      disabled={sigPage <= 1}
+                      onClick={() => setSigPage((p) => Math.max(1, p - 1))}
+                    >
+                      ◀
+                    </button>
+                    <span style={{ fontSize: '12px' }}>Page {sigPage} of {pdfPages}</span>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                      disabled={sigPage >= pdfPages}
+                      onClick={() => setSigPage((p) => Math.min(pdfPages, p + 1))}
+                    >
+                      ▶
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'inline-block',
+                  width: '100%',
+                  textAlign: 'center',
+                  background: '#f4f7f6',
+                  borderRadius: '8px',
+                  padding: '12px 0',
+                  overflow: 'auto',
+                  maxHeight: '420px',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                    cursor: 'crosshair',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                  }}
+                  onClick={handlePdfClick}
+                >
+                  <canvas ref={pdfCanvasRef} style={{ display: 'block', maxWidth: '100%' }} />
+
+                  {/* Placed signature box overlay */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${sigPos.x * 100}%`,
+                      top: `${sigPos.y * 100}%`,
+                      width: `${sigPos.w * 100}%`,
+                      height: `${sigPos.h * 100}%`,
+                      border: '2px dashed #14866c',
+                      background: 'rgba(20, 134, 108, 0.16)',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {signType === 'upload' && uploadedImage ? (
+                      <img src={uploadedImage} alt="Sig" style={{ maxHeight: '90%', maxWidth: '90%', objectFit: 'contain' }} />
+                    ) : signType === 'type' && typedName ? (
+                      <span style={{ fontFamily: 'cursive, "Brush Script MT", sans-serif', fontSize: '14px', color: '#123e35' }}>
+                        {typedName}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#14866c', fontWeight: 600 }}>
+                        ✒ Signature Here
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div style={{ margin: '20px 0 14px' }}>
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', cursor: 'pointer', lineHeight: '1.6' }}>

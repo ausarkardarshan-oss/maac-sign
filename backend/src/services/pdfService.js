@@ -56,10 +56,72 @@ function safeText(str) {
     .replace(/[^\x20-\x7E]/g, ' ');
 }
 
+function detectSignatureArea(pdfDoc) {
+  try {
+    const pages = pdfDoc.getPages();
+    for (let pIdx = pages.length - 1; pIdx >= 0; pIdx--) {
+      const page = pages[pIdx];
+      const { width: pWidth, height: pHeight } = page.getSize();
+      const contents = page.node.Contents();
+      if (!contents) continue;
+      const stream = pdfDoc.context.lookup(contents);
+      if (!stream) continue;
+      const { decodePDFRawStream } = require('pdf-lib');
+      const rawBytes = decodePDFRawStream(stream).decode();
+      const text = Buffer.from(rawBytes).toString('latin1');
+
+      if (/electronic\s*\/?\s*typed\s*signature/i.test(text)) {
+        return {
+          pageIndex: pIdx,
+          x: Math.min(258, pWidth * 0.43),
+          y: Math.min(302, pHeight * 0.36),
+          width: 170,
+          height: 42,
+          dateX: Math.min(260, pWidth * 0.43),
+          dateY: Math.min(264, pHeight * 0.31),
+        };
+      }
+
+      const sigMatch = text.match(/(?:(?:authorized|employee|client|applicant)?\s*signature|sign\s*here|signed\s*by)[\s\S]{0,120}?(?:1 0 0 1 ([\d\.-]+) ([\d\.-]+) cm)/i);
+      if (sigMatch && sigMatch[1] && sigMatch[2]) {
+        const foundX = parseFloat(sigMatch[1]);
+        const foundY = parseFloat(sigMatch[2]);
+        if (foundX >= 0 && foundX < pWidth && foundY >= 20 && foundY < pHeight) {
+          return {
+            pageIndex: pIdx,
+            x: foundX,
+            y: foundY,
+            width: 160,
+            height: 42,
+            dateX: foundX,
+            dateY: Math.max(20, foundY - 35),
+          };
+        }
+      }
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  const pages = pdfDoc.getPages();
+  const lastIdx = pages.length - 1;
+  const lastPage = pages[lastIdx];
+  const { width: pWidth } = lastPage.getSize();
+  return {
+    pageIndex: lastIdx,
+    x: Math.max(40, pWidth - 220),
+    y: 75,
+    width: 160,
+    height: 42,
+    dateX: Math.max(40, pWidth - 220),
+    dateY: 52,
+  };
+}
+
 /**
  * PHASE 5: Final Signed PDF Generator
- * Stamps signing fields directly at configured positions on original document pages,
- * and appends an official Execution & Signature Record page.
+ * Stamps signing fields directly at configured positions on original document pages.
+ * Never appends unnecessary execution pages.
  */
 async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, documentId, fields = [] }) {
   if (!originalPdfBuffer || originalPdfBuffer.length < 8) {
@@ -135,11 +197,13 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
 
       if (['signature', 'initials', 'initial'].includes(f.type)) {
         let drawn = false;
-        if (signer.signature && typeof signer.signature === 'string' && signer.signature.startsWith('data:image/png;base64,')) {
+        const sigSource = f.value || signer.signature;
+        if (sigSource && typeof sigSource === 'string' && sigSource.startsWith('data:image/')) {
           try {
-            const base64Data = signer.signature.replace(/^data:image\/png;base64,/, '');
+            const isPng = sigSource.startsWith('data:image/png');
+            const base64Data = sigSource.replace(/^data:image\/\w+;base64,/, '');
             const imgBuffer = Buffer.from(base64Data, 'base64');
-            const embeddedImg = await pdfDoc.embedPng(imgBuffer);
+            const embeddedImg = isPng ? await pdfDoc.embedPng(imgBuffer) : await pdfDoc.embedJpg(imgBuffer);
             const imgDims = embeddedImg.scaleToFit(fieldW - 4, fieldH - 4);
             targetPage.drawImage(embeddedImg, {
               x: fieldX + (fieldW - imgDims.width) / 2,
@@ -151,8 +215,8 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
           } catch {}
         }
         if (!drawn) {
-          const sigText = (signer.signature && signer.signature.startsWith('Typed: '))
-            ? signer.signature.replace('Typed: ', '')
+          const sigText = (sigSource && sigSource.startsWith('Typed: '))
+            ? sigSource.replace('Typed: ', '')
             : (signer.name || (f.type === 'initials' || f.type === 'initial' ? 'Initial' : 'Signature'));
           targetPage.drawText(safeText(sigText), {
             x: fieldX + 4,
@@ -296,21 +360,18 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
     }
   }
 
-  // If no specific fields were placed on the document pages, stamp signatures at the bottom of the last page
-  if ((!fields || fields.length === 0) && Array.isArray(signers) && signers.length > 0) {
+  // If no signature fields were placed on the document pages, stamp signatures directly on the document
+  const hasPlacedSignature = Array.isArray(fields) && fields.some((f) => ['signature', 'initials', 'initial'].includes(f.type));
+  if (!hasPlacedSignature && Array.isArray(signers) && signers.length > 0) {
+    const sigArea = detectSignatureArea(pdfDoc);
     const pages = pdfDoc.getPages();
-    const lastPage = pages[pages.length - 1];
-    const { width: pWidth } = lastPage.getSize();
-    const stampMargin = 40;
-    const availableWidth = pWidth - stampMargin * 2;
-    const numSigners = Math.min(signers.length, 3);
-    const colWidth = availableWidth / numSigners;
+    const targetPage = pages[sigArea.pageIndex] || pages[pages.length - 1];
 
-    for (let i = 0; i < signers.length; i++) {
-      const s = signers[i];
-      const col = i % numSigners;
-      const sigX = stampMargin + col * colWidth;
-      const sigY = 25 + Math.floor(i / numSigners) * 50;
+    for (let idx = 0; idx < signers.length; idx++) {
+      const s = signers[idx];
+      const offsetX = idx * 180;
+      const targetX = Math.min(targetPage.getSize().width - 180, sigArea.x + offsetX);
+      const targetY = sigArea.y;
 
       let drawn = false;
       if (s.signature && typeof s.signature === 'string' && s.signature.startsWith('data:image/')) {
@@ -319,35 +380,41 @@ async function finalizeSignedPdf({ originalPdfBuffer, signers, documentName, doc
           const base64Data = s.signature.replace(/^data:image\/\w+;base64,/, '');
           const imgBuffer = Buffer.from(base64Data, 'base64');
           const embeddedImg = isPng ? await pdfDoc.embedPng(imgBuffer) : await pdfDoc.embedJpg(imgBuffer);
-          const imgDims = embeddedImg.scaleToFit(Math.min(130, colWidth - 20), 35);
-          lastPage.drawImage(embeddedImg, {
-            x: sigX,
-            y: sigY,
+          const imgDims = embeddedImg.scaleToFit(sigArea.width, sigArea.height);
+          targetPage.drawImage(embeddedImg, {
+            x: targetX,
+            y: targetY,
             width: imgDims.width,
             height: imgDims.height,
           });
           drawn = true;
         } catch {}
       }
+
       if (!drawn) {
         const sigText = (s.signature && s.signature.startsWith('Typed: '))
           ? s.signature.replace('Typed: ', '')
-          : (s.name || 'Signature');
-        lastPage.drawText(safeText(sigText), {
-          x: sigX,
-          y: sigY + 12,
-          size: 11,
+          : (s.name || 'Verified Signer');
+        targetPage.drawText(safeText(sigText), {
+          x: targetX,
+          y: targetY + 10,
+          size: 13,
           font: fontItalic,
           color: C_GREEN,
         });
       }
-      lastPage.drawText(safeText(`${s.name || 'Signer'} • ${new Date().toLocaleDateString('en-US')}`), {
-        x: sigX,
-        y: sigY,
-        size: 7.5,
-        font: fontRegular,
-        color: C_MUTED,
-      });
+
+      // Draw date if date location exists
+      if (sigArea.dateY) {
+        const dateText = new Date(s.signed_at || Date.now()).toLocaleDateString('en-US');
+        targetPage.drawText(safeText(dateText), {
+          x: targetX,
+          y: sigArea.dateY,
+          size: 9.5,
+          font: fontRegular,
+          color: C_DARK,
+        });
+      }
     }
   }
 

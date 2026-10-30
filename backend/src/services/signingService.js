@@ -1164,7 +1164,7 @@ async function submitSignature(token, { signature, signatureType: customSignatur
 // ─────────────────────────────────────────────────────────────────────────────
 // Self-sign workflow: sign yourself (owner signs without external recipient)
 // ─────────────────────────────────────────────────────────────────────────────
-async function selfSign({ userId, documentId, signature, signatureType, consent, fieldValues = {}, ipAddress, userAgent }) {
+async function selfSign({ userId, documentId, signature, signatureType, consent, fieldValues = {}, fields = [], ipAddress, userAgent }) {
   const doc = await Document.findOne({ _id: documentId, owner_id: userId });
   if (!doc) {
     const err = new Error('Document not found');
@@ -1219,6 +1219,27 @@ async function selfSign({ userId, documentId, signature, signatureType, consent,
     status: 'pending',
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
+
+  // Save any placed fields so finalizeSignedPdf overlays them at exact positions
+  if (Array.isArray(fields) && fields.length > 0) {
+    for (const f of fields) {
+      await SigningField.create({
+        _id: uid(),
+        request_id: requestId,
+        recipient_id: recipientId,
+        page: Number(f.page) || 1,
+        type: f.type || 'signature',
+        label: f.label || 'Signature',
+        x: Number(f.x) || 0.6,
+        y: Number(f.y) || 0.8,
+        width: Number(f.width) || 0.25,
+        height: Number(f.height) || 0.08,
+        required: f.required !== false,
+        value: f.type === 'signature' ? signature.trim() : (f.value || ''),
+        completed: true,
+      });
+    }
+  }
 
   await appendAudit(documentId, userId, 'self_sign_started', { request: requestId });
 

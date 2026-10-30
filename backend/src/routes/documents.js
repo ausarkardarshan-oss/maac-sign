@@ -174,7 +174,7 @@ router.post('/:id/email', async (req, res, next) => {
 router.post('/:id/self-sign', async (req, res, next) => {
   try {
     const { selfSign } = require('../services/signingService');
-    const { signature, signatureType, consent, fieldValues } = req.body;
+    const { signature, signatureType, consent, fieldValues, fields } = req.body;
     const ipAddress = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
     const userAgent = req.headers['user-agent'] || 'Web Browser';
 
@@ -185,6 +185,7 @@ router.post('/:id/self-sign', async (req, res, next) => {
       signatureType,
       consent,
       fieldValues: fieldValues || {},
+      fields: fields || [],
       ipAddress,
       userAgent,
     });
