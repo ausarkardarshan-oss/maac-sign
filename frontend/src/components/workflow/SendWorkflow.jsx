@@ -1171,20 +1171,29 @@ function SendSuccess({ results, onClose }) {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
         {results.map((r, i) => (
-          <div key={i} className="card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <div key={i} className="card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontWeight: 600, fontSize: '13px' }}>{r.email}</div>
-              <div style={{ fontSize: '12px', color: r.emailSent ? '#14866c' : '#b33232' }}>
-                {r.emailSent ? '✓ Invitation email sent' : `⚠ Email failed — share link manually`}
+              <div style={{ fontSize: '12px', color: r.emailSent ? '#14866c' : '#b33232', marginTop: '2px' }}>
+                {r.emailSent ? '✓ Invitation email dispatched via SMTP' : `⚠ Email failed — share link manually`}
               </div>
             </div>
-            {!r.emailSent && r.invitation && (
-              <button className="btn" style={{ fontSize: '11px', whiteSpace: 'nowrap' }} onClick={() => copyLink(r.invitation)}>
-                Copy link
+            {r.invitation && (
+              <button
+                type="button"
+                className="btn"
+                style={{ fontSize: '12px', padding: '6px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}
+                onClick={() => copyLink(r.invitation)}
+              >
+                📋 Copy signing link
               </button>
             )}
           </div>
         ))}
+      </div>
+
+      <div style={{ background: '#f5faf8', borderLeft: '3px solid #24aa86', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: '#274b43', marginBottom: '20px' }}>
+        <strong>💡 Note:</strong> If the recipient does not see the email in their Inbox, please have them check their <strong>Spam / Junk folder</strong> (email providers often flag automated relays), or share the copied signing link directly.
       </div>
 
       <div className="btngroup" style={{ justifyContent: 'center' }}>

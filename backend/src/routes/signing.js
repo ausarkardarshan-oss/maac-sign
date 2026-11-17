@@ -10,6 +10,7 @@ const {
   sendSigningRequest,
   resendSigningInvitation,
   cancelSigningRequest,
+  getRecipientSigningLink,
   listSigningRequests,
   getSigningRequest,
   getRequestFields,
@@ -26,13 +27,35 @@ const fs = require('node:fs');
 
 const router = Router();
 
-// ── Email / SMTP health ───────────────────────────────────────────────────────
+// ── Email / SMTP health & diagnostics ─────────────────────────────────────────
 router.get('/email/status', requireAuth, async (req, res) => {
   try {
     const status = await verifySmtpConnection();
     res.json(status);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/email/test', requireAuth, async (req, res) => {
+  try {
+    const { toEmail } = req.body;
+    const dest = toEmail || req.user.email;
+    const emailService = require('../services/emailService');
+    const testResult = await emailService.sendMail({
+      to: dest,
+      subject: 'MAAC AI Sign — SMTP Test Delivery',
+      text: 'This is a test notification confirming your email configuration is working.',
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:24px;background:#f4f7f6;border-radius:10px;">
+          <h2 style="color:#14866c;margin-top:0;">✦ MAAC AI Sign — SMTP Test Delivery</h2>
+          <p>Your mail server delivered this message successfully at ${new Date().toUTCString()}.</p>
+        </div>
+      `,
+    });
+    res.json({ ok: true, to: dest, result: testResult });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -180,6 +203,20 @@ router.post('/requests/:id/resend', requireAuth, async (req, res, next) => {
     const result = await resendSigningInvitation({
       userId: req.user.id,
       requestId: req.params.id,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Get/Copy signing link for recipient ───────────────────────────────────────
+router.post('/requests/:id/recipients/:recipientId/link', requireAuth, async (req, res, next) => {
+  try {
+    const result = await getRecipientSigningLink({
+      userId: req.user.id,
+      requestId: req.params.id,
+      recipientId: req.params.recipientId,
     });
     res.json(result);
   } catch (err) {

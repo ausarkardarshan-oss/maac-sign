@@ -294,4 +294,49 @@ test('Multi-Recipient, Field Stamping, Sequential Signing, and Self-Sign Workflo
     try { fs.rmSync(path.join(STORAGE_DIR, `${doc2Id}_signed.pdf`), { force: true }); } catch {}
     try { fs.rmSync(path.join(STORAGE_DIR, `cert_${doc2Id}.pdf`), { force: true }); } catch {}
   });
+
+  await t.test('getRecipientSigningLink generates a fresh valid invitation URL for pending recipient', async () => {
+    // Create fresh document
+    const doc3Id = uid();
+    const doc3 = await Document.create({
+      _id: doc3Id,
+      owner_id: testUser.id,
+      name: 'Link Test Doc.pdf',
+      filename: `${doc3Id}.pdf`,
+      mime: 'application/pdf',
+      size: 100,
+      sha256: 'dummyhash123',
+      status: 'draft',
+      created: now(),
+      updated: now(),
+    });
+
+    // Create draft and recipient
+    const draft = await signingService.createDraftRequest({
+      userId: testUser.id,
+      documentId: doc3.id,
+      subject: 'Test Link Generation',
+    });
+
+    const [rec] = await signingService.setRequestRecipients({
+      userId: testUser.id,
+      requestId: draft.id,
+      recipients: [{ name: 'Link Signer', email: 'link@example.com', order: 1 }],
+    });
+
+    const linkResult = await signingService.getRecipientSigningLink({
+      userId: testUser.id,
+      requestId: draft.id,
+      recipientId: rec.id,
+    });
+
+    assert.equal(linkResult.ok, true);
+    assert.ok(linkResult.invitationUrl);
+    assert.match(linkResult.invitationUrl, /\/sign\/[a-f0-9]{64}/);
+
+    // Clean up draft request and doc3
+    await Request.deleteMany({ _id: draft.id });
+    await Recipient.deleteMany({ request_id: draft.id });
+    await Document.deleteMany({ _id: doc3Id });
+  });
 });

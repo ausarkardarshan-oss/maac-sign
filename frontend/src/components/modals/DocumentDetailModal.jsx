@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { documentService } from '../../services/documentService.js';
+import { signingService } from '../../services/signingService.js';
 import { toast } from '../common/Toast.jsx';
 
 function StatusBadge({ status }) {
@@ -35,6 +36,20 @@ export function DocumentDetailModal({ docId, onClose, onRefresh }) {
   useEffect(() => {
     if (docId) loadDetails();
   }, [docId]);
+
+  const handleCopyRecipientLink = async (r) => {
+    const reqId = doc?.request?._id || doc?.request?.id;
+    if (!reqId || !r.id) return;
+    try {
+      const res = await signingService.getRecipientLink(reqId, r.id);
+      if (res?.invitationUrl) {
+        await navigator.clipboard.writeText(res.invitationUrl);
+        toast(`Signing link for ${r.name || r.email} copied!`);
+      }
+    } catch (err) {
+      toast(err.message || 'Failed to copy signing link');
+    }
+  };
 
   const handleSendEmail = async (e) => {
     e.preventDefault();
@@ -272,9 +287,22 @@ export function DocumentDetailModal({ docId, onClose, onRefresh }) {
                             <strong>#{r.order || i + 1} {r.name}</strong>
                             <span style={{ color: 'var(--muted)', fontSize: '12px', marginLeft: '6px' }}>({r.email})</span>
                           </div>
-                          <span className={`status ${r.status === 'signed' ? 'completed' : r.status}`}>
-                            {r.status === 'signed' ? 'Signed' : r.viewed_at ? 'Viewed' : 'Pending'}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className={`status ${r.status === 'signed' ? 'completed' : r.status}`}>
+                              {r.status === 'signed' ? 'Signed' : r.viewed_at ? 'Viewed' : 'Pending'}
+                            </span>
+                            {r.status !== 'signed' && (
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{ padding: '3px 8px', fontSize: '11px', lineHeight: 1.2 }}
+                                onClick={() => handleCopyRecipientLink(r)}
+                                title="Copy direct signing link to clipboard"
+                              >
+                                📋 Copy Link
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div style={{ fontSize: '12px', color: statusColor, marginTop: '4px' }}>
                           {statusLabel}

@@ -531,7 +531,47 @@ async function resendSigningInvitation({ userId, requestId }) {
     throw wrapped;
   }
 
-  return { ok: true, emailSent, recipient: recipient.email };
+  return { ok: true, emailSent, recipient: recipient.email, invitationUrl };
+}
+
+// ─── Get/Generate live signing invitation link for a recipient ────────────────
+async function getRecipientSigningLink({ userId, requestId, recipientId }) {
+  const req = await Request.findOne({ _id: requestId, owner_id: userId });
+  if (!req) {
+    const err = new Error('Signing request not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const recipient = await Recipient.findOne({ _id: recipientId, request_id: requestId });
+  if (!recipient) {
+    const err = new Error('Recipient not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (recipient.status === 'signed') {
+    const err = new Error('This recipient has already completed their signature');
+    err.status = 400;
+    throw err;
+  }
+
+  // Generate a fresh token
+  const { token, tokenHash } = makeToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  recipient.token_hash = tokenHash;
+  recipient.expires_at = expiresAt;
+  await recipient.save();
+
+  const invitationUrl = `${env.FRONTEND_URL}/sign/${token}`;
+  return {
+    ok: true,
+    recipientId: recipient.id,
+    email: recipient.email,
+    name: recipient.name,
+    invitationUrl,
+    expiresAt,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1319,6 +1359,7 @@ module.exports = {
   // Management
   resendSigningInvitation,
   cancelSigningRequest,
+  getRecipientSigningLink,
   listSigningRequests,
   getSigningRequest,
   getRequestFields,

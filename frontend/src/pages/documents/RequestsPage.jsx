@@ -38,11 +38,37 @@ export function RequestsPage() {
   const handleResend = async (r) => {
     setActionLoading(r.id);
     try {
-      await signingService.resendRequest(r.id);
-      toast(`Reminder email sent to recipient via Brevo SMTP`);
+      const res = await signingService.resendRequest(r.id);
+      if (res?.invitationUrl) {
+        try {
+          await navigator.clipboard.writeText(res.invitationUrl);
+          toast(`Reminder sent! Signing link copied to clipboard.`);
+        } catch {
+          toast(`Reminder email sent to recipient.`);
+        }
+      } else {
+        toast(`Reminder email sent to recipient.`);
+      }
       load();
     } catch (err) {
       toast(err.message || 'Failed to resend reminder');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCopyLink = async (r, rec) => {
+    const targetRec = rec || (r.recipients && r.recipients.find((x) => x.status !== 'signed')) || r.recipients?.[0];
+    if (!targetRec) return;
+    setActionLoading(`${r.id}_${targetRec.id}`);
+    try {
+      const res = await signingService.getRecipientLink(r.id, targetRec.id);
+      if (res?.invitationUrl) {
+        await navigator.clipboard.writeText(res.invitationUrl);
+        toast(`Signing link for ${targetRec.name || targetRec.email} copied to clipboard!`);
+      }
+    } catch (err) {
+      toast(err.message || 'Failed to generate signing link');
     } finally {
       setActionLoading(null);
     }
@@ -130,6 +156,17 @@ export function RequestsPage() {
                               <span className={`status ${rec.status === 'signed' ? 'completed' : rec.status}`} style={{ fontSize: '10px', padding: '2px 6px' }}>
                                 {rec.status === 'signed' ? 'Signed' : rec.viewed_at ? 'Viewed' : 'Pending'}
                               </span>
+                              {r.status === 'pending' && rec.status !== 'signed' && (
+                                <button
+                                  type="button"
+                                  className="link"
+                                  style={{ fontSize: '11px', padding: '1px 4px', color: 'var(--accent)', textDecoration: 'none' }}
+                                  onClick={(e) => { e.stopPropagation(); handleCopyLink(r, rec); }}
+                                  title="Copy signing link for this recipient"
+                                >
+                                  📋 Copy
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -152,8 +189,16 @@ export function RequestsPage() {
                             <button
                               className="btn"
                               disabled={actionLoading === r.id}
+                              onClick={() => handleCopyLink(r)}
+                              title="Copy signing link to clipboard"
+                            >
+                              📋 Copy Link
+                            </button>
+                            <button
+                              className="btn"
+                              disabled={actionLoading === r.id}
                               onClick={() => handleResend(r)}
-                              title="Resend email reminder via Brevo SMTP"
+                              title="Resend email reminder via SMTP"
                             >
                               {actionLoading === r.id ? 'Sending…' : 'Resend Email'}
                             </button>

@@ -4,8 +4,10 @@ export const signingService = {
   listRequests: () => api.get('/requests'),
   createRequest: (data) => api.post('/requests', data),
   resendRequest: (requestId) => api.post(`/requests/${requestId}/resend`),
+  getRecipientLink: (requestId, recipientId) => api.post(`/requests/${requestId}/recipients/${recipientId}/link`),
   cancelRequest: (requestId, reason) => api.post(`/requests/${requestId}/cancel`, { reason }),
   getEmailStatus: () => api.get('/email/status'),
+  testEmail: (toEmail) => api.post('/email/test', { toEmail }),
   // Public (recipient) endpoints
   getSigningInfo: (token) => api.get(`/sign/${token}`),
   submitSignature: (token, data) => api.post(`/sign/${token}`, data),
